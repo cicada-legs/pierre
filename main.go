@@ -1,14 +1,14 @@
 package main
 
 import (
+	"bufio"
 	"flag"
 	"net/http"
-	"strings"
-
-	"bufio"
 	"os"
-
+	"runtime"
+	"strings"
 	"time"
+
 	// "errors"
 	"fmt"
 )
@@ -29,7 +29,7 @@ func main() {
 
 	fmt.Printf(`
 ▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪
-Pierre v1.0	                                        @cicada-legs
+pierre v1.0	                                        @cicada-legs
 ▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪
 
                   ███                                       
@@ -50,8 +50,8 @@ Pierre v1.0	                                        @cicada-legs
 ❖   Method 				%s
 ❖   Wordlist 				%s
 ❖   Extensions 				%s
-❖   Threads
-❖   Timeout
+❖   Threads (Goroutines) 		%d
+❖   Timeout 				%d
 
 ▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪▪
 
@@ -61,7 +61,7 @@ Pierre v1.0	                                        @cicada-legs
 		} else {
 			return "GET"
 		}
-	}(), scan.wordlist_file, scan.extension)
+	}(), scan.wordlist_file, scan.extension, runtime.NumGoroutine(), scan.timeout)
 
 	scan.fuzz_scan()
 
@@ -71,10 +71,12 @@ Pierre v1.0	                                        @cicada-legs
 
 func parse_flags(scan *scan_config) {
 	//
-	flag.BoolVar(&scan.post, "P", false, "send HTTP request: POST by default") // request type
-	flag.StringVar(&scan.wordlist_file, "w", "", "provide a wordlist")         //chjange later??
+	flag.BoolVar(&scan.post, "P", false, "send HTTP request: POST by default") // TODO: make format -P GET or smth
+	flag.StringVar(&scan.wordlist_file, "w", "", "provide a wordlist")         //change later??
 	flag.StringVar(&scan.url, "u", "", "target url")
 	flag.StringVar(&scan.extension, "x", "", "list of extensions to fuzz with: comma separated")
+	flag.IntVar(&scan.threads, "t", 1, "specify the number of threads to run on")
+	flag.IntVar(&scan.timeout, "c", 100, "specify the limit for when requests should timeout")
 
 	flag.Parse()
 }
@@ -85,6 +87,8 @@ type scan_config struct {
 	url           string
 	wordlist_file string
 	extension     string
+	threads       int
+	timeout       int
 }
 
 func (s scan_config) fuzz_scan() { //post by default
@@ -102,11 +106,41 @@ func (s scan_config) fuzz_scan() { //post by default
 	} else {
 		//TODO: change this to look for a word amd replace it
 
-		for scanner.Scan() { //SHOW REDIRECTS
+		for scanner.Scan() { //TODO: SHOW REDIRECTS
 
 			for i := 0; i < len(ext_slice); i++ {
-				resp, err := http.Get(s.url + scanner.Text() + ext_slice[i])
-				handle_errors(err, "get error")
+
+				// ctx, cancel := context.WithTimeout(context.Background(), s.timeout*time.Second)
+				// defer cancel()
+
+				// req, err := http.NewRequestWithContext(ctx, "GET", s.url+scanner.Text()+ext_slice[i], nil)
+
+				client := &http.Client{
+					Timeout: time.Duration(s.timeout) * time.Millisecond,
+				}
+				req, err := http.NewRequest("GET", s.url+scanner.Text()+ext_slice[1], nil) // client.Get(s.url + scanner.Text() + ext_slice[1])
+
+				if err != nil {
+					handle_errors(err, "getettet")
+					return
+				}
+				resp, err := client.Do(req)
+				if err != nil {
+					fmt.Println(err)
+					continue
+				}
+
+				//handle_errors(err, "second ewrrorerko")
+
+				// client := http.Client{Timeout: s.timeout * time.Second} //TODO: change this to be the correct thing until im ready
+				// fmt.Println("timeout test: ", s.timeout)
+				// resp, err := client.Get(s.url + scanner.Text() + ext_slice[i])
+				// if os.IsTimeout(err) {
+				// 	handle_errors(err, "request timeout") //for when the request itself times out
+				// 	continue                              //go to the next loop iteraion
+				// } else if err != nil {
+				// 	handle_errors(err, "get error") // for when the host isnt up/cant be connected to
+				// // }
 				defer resp.Body.Close()
 				fmt.Println("/"+scanner.Text()+ext_slice[i]+"\t\t\t[ Status:", resp.StatusCode, " Size:", resp.ContentLength, "]")
 				//fmt.Printf("/%s%s\t\t\t[ Status: %d  Size:%d ]\n", scanner.Text(), ext_slice[i], resp.StatusCode, resp.ContentLength)
@@ -120,6 +154,7 @@ func (s scan_config) fuzz_scan() { //post by default
 func handle_errors(err error, msg string) {
 	if err != nil {
 		fmt.Println(msg)
+		os.Exit(1) //change this later to be different for different errors
 	}
 }
 
