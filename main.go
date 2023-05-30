@@ -96,13 +96,17 @@ type scan_config struct {
 
 func (s scan_config) fuzz_scan() { //post by default
 
+	count := 0
 	output := ""
 	ext_slice := strings.Split(s.extension, ",") // TODO: put this somewhere better
 
 	fileread, err := os.Open(s.wordlist_file)
 	handle_errors(err, "Please provide a wordlist: -w <filepath>")
-	scanner := bufio.NewScanner(fileread)
-	scanner.Split(bufio.ScanLines)
+	sc1 := bufio.NewScanner(fileread)
+	sc1.Split(bufio.ScanLines)
+	sc2 := bufio.NewScanner(fileread)
+	sc2.Split(bufio.ScanLines)
+	total := count_file_lines(*sc2) * len(ext_slice)
 
 	if s.post {
 		// resp, err := http.Post(s.url)
@@ -110,14 +114,16 @@ func (s scan_config) fuzz_scan() { //post by default
 	} else {
 		//TODO: change this to look for a word amd replace it
 
-		for scanner.Scan() { //TODO: SHOW REDIRECTS
+		for sc1.Scan() { //TODO: SHOW REDIRECTS
 
 			for i := 0; i < len(ext_slice); i++ {
+				count++
+				loading_animation(count, total, "<", ">", 100, "=") //TODO: this isnt printing for some reason
 
 				client := &http.Client{
 					Timeout: time.Duration(s.timeout) * time.Millisecond,
 				}
-				req, err := http.NewRequest("GET", s.url+scanner.Text()+ext_slice[i], nil) // client.Get(s.url + scanner.Text() + ext_slice[1])
+				req, err := http.NewRequest("GET", s.url+sc1.Text()+ext_slice[i], nil) // client.Get(s.url + scanner.Text() + ext_slice[1])
 
 				if err != nil {
 					handle_errors(err, "getettet")
@@ -133,7 +139,7 @@ func (s scan_config) fuzz_scan() { //post by default
 				defer resp.Body.Close()
 				// fmt.Println("code", resp.StatusCode)
 				if strings.Contains(s.filter_codes_string, strconv.Itoa(resp.StatusCode)) { //add to output if matching code
-					output += output + "/" + scanner.Text() + ext_slice[i] + "\t\t\t[ Status: " + strconv.Itoa(resp.StatusCode) + " Size: " + strconv.FormatInt(resp.ContentLength, 10) + " ]\n"
+					output += output + "/" + sc1.Text() + ext_slice[i] + "\t\t\t[ Status: " + strconv.Itoa(resp.StatusCode) + " Size: " + strconv.FormatInt(resp.ContentLength, 10) + " ]\n"
 					// fmt.Printf("/%s%s\t\t\t[ Status: %d  Size:%d ]\n", scanner.Text(), ext_slice[i], resp.StatusCode, resp.ContentLength)
 					//fmt.Println(output)
 
@@ -151,5 +157,29 @@ func handle_errors(err error, msg string) {
 	if err != nil {
 		fmt.Printf(msg)
 		os.Exit(1) //change this later to be different for different errors
+	}
+}
+
+func count_file_lines(sc bufio.Scanner) int {
+	lines := 0
+	for sc.Scan() {
+		lines++
+	}
+	return lines
+}
+
+func loading_animation(iterate int, total int, prefix string, suffix string, length int, fill string) {
+	percentage := float64(iterate) / float64(total)
+	bar_progress := int(length * iterate / total)
+	end := "="
+
+	if iterate == total {
+		end = "]"
+	}
+
+	bar := strings.Repeat(fill, bar_progress) + end + strings.Repeat("-", bar_progress)
+	fmt.Printf("\r%s [%s] %f%% %s", prefix, bar, percentage, suffix)
+	if iterate == total {
+		fmt.Println()
 	}
 }
