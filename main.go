@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"flag"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"runtime"
@@ -207,7 +208,16 @@ func (s scan_config) fuzz_scan() { //post by default
 				defer resp.Body.Close()
 
 				if strings.Contains(s.filter_codes_string, strconv.Itoa(resp.StatusCode)) { //add to output if matching code
-					output += sc1.Text() + ext_slice[i] + "\t\t\t[ Status: " + strconv.Itoa(resp.StatusCode) + " Size: " + strconv.FormatInt(resp.ContentLength, 10) + " ]\n"
+
+					body_bytes, err := ioutil.ReadAll(resp.Body)
+
+					if err != nil {
+						handle_errors(err, "error counting lines")
+					}
+
+					//FIXME: this formatting is painful, tidy it up
+					output += sc1.Text() + ext_slice[i] + "\t\t\t[ Status: " + strconv.Itoa(resp.StatusCode) + " |" + " Size: " + strconv.Itoa(count_response_bytes(body_bytes)) + " |" + " Words: " + strconv.Itoa(count_response_words(body_bytes)) + " |" + " Lines: " + strconv.Itoa(count_response_lines(body_bytes)) + " ]\n"
+
 					//DELETE BELOW LATER
 					// read and print entire response
 					// body, err := httputil.DumpResponse(resp, true)
@@ -215,15 +225,6 @@ func (s scan_config) fuzz_scan() { //post by default
 					// 	handle_errors(err, "error reading body")
 					// }
 					// output += "~~~~~~~~~~~~~~~~~~~~~~~~~~~\n" + string(body) + "~~~~~~~~~~~~~~~~~~~~~~~~~~~\n" + "\n"
-
-					//another
-
-					//convert resp.Location() to string
-					// redirect_url, err := resp.Location()
-					// if err != nil {
-					// 	handle_errors(err, err.Error())
-					// }
-					// output += redirect_url.String() + "\n"
 
 					//another
 
@@ -246,4 +247,22 @@ func handle_errors(err error, msg string) {
 		fmt.Println(msg)
 		os.Exit(1) //change this later to be different for different errors
 	}
+}
+
+// maybe get rid of these functions and just do it in the main function
+func count_response_bytes(body_bytes []byte) int {
+
+	return len(body_bytes)
+}
+
+func count_response_lines(body_bytes []byte) int {
+
+	linecount := strings.Count(string(body_bytes), "\n")
+	return linecount
+}
+
+func count_response_words(body_bytes []byte) int {
+
+	word_count := strings.Count(string(body_bytes), " ")
+	return word_count
 }
