@@ -87,10 +87,10 @@ func parse_flags(scan *scan_config) {
 	flag.StringVar(&scan.extension, "x", "", "list of extensions to fuzz with: comma separated")
 	flag.IntVar(&scan.threads, "th", 1, "specify the number of threads to run on")
 	flag.IntVar(&scan.timeout, "to", 500, "specify the limit for when requests should timeout")
-	flag.StringVar(&scan.filter_codes_string, "fi", "200,204,301,302,307,400,401,403,404,405,500", "filter include; specify which status codes to be included in output")
+	flag.StringVar(&scan.filter_include, "fi", "200,204,301,302,307,400,401,403,405,500", "filter include; specify which status codes to be included in output")
+	flag.StringVar(&scan.filter_exclude, "fe", "404", "filter exclude; specify which status codes to be excluded in output")
 	//TODO: add more codes!!!
 	flag.StringVar(&scan.header, "H", "", "specify a header to be sent with the request. Example: Host: FUZZ.example.com")
-	//flag.StringVar(&scan.filter_codes_string, "filter-status", "200,204,301,302,307,400,401,403,404,405,500", "specify which status codes to be included in output")
 
 	flag.Parse()
 
@@ -106,14 +106,15 @@ func parse_flags(scan *scan_config) {
 
 type scan_config struct {
 	//
-	post                bool
-	url                 string
-	wordlist_file       string
-	extension           string
-	threads             int
-	timeout             int
-	filter_codes_string string
-	header              string
+	post           bool
+	url            string
+	wordlist_file  string
+	extension      string
+	threads        int
+	timeout        int
+	filter_include string
+	filter_exclude string
+	header         string
 }
 
 func (s scan_config) fuzz_scan() { //post by default
@@ -156,7 +157,7 @@ func (s scan_config) fuzz_scan() { //post by default
 
 				defer resp.Body.Close()
 				// fmt.Println("code", resp.StatusCode)
-				if strings.Contains(s.filter_codes_string, strconv.Itoa(resp.StatusCode)) { //add to output if matching code
+				if strings.Contains(s.filter_include, strconv.Itoa(resp.StatusCode)) { //add to output if matching code
 					output += sc1.Text() + ext_slice[i] + "\n"
 				}
 			}
@@ -207,7 +208,7 @@ func (s scan_config) fuzz_scan() { //post by default
 
 				defer resp.Body.Close()
 
-				if strings.Contains(s.filter_codes_string, strconv.Itoa(resp.StatusCode)) { //add to output if matching code
+				if strings.Contains(s.filter_include, strconv.Itoa(resp.StatusCode)) { //add to output if matching code
 
 					body_bytes, err := ioutil.ReadAll(resp.Body)
 
