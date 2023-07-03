@@ -84,14 +84,18 @@ func parse_flags(scan *scan_config) {
 	flag.StringVar(&scan.extension, "x", "", "list of extensions to fuzz with: comma separated")
 	flag.IntVar(&scan.threads, "th", 1, "specify the number of threads to run on")
 	flag.IntVar(&scan.timeout, "to", 100, "specify the limit for when requests should timeout")
-	flag.StringVar(&scan.filter_codes_string, "fs", "200,204,301,302,307,400,401,403,404,405,500", "specify which status codes to be included in output") //TODO: add more codes!!!
+	flag.StringVar(&scan.filter_codes_string, "fi", "200,204,301,302,307,400,401,403,404,405,500", "filter include; specify which status codes to be included in output")
+	//TODO: add more codes!!!
+	flag.StringVar(&scan.header, "H", "", "specify a header to be sent with the request. Example: Host: FUZZ.example.com")
+	//flag.StringVar(&scan.filter_codes_string, "filter-status", "200,204,301,302,307,400,401,403,404,405,500", "specify which status codes to be included in output")
 
 	flag.Parse()
 
-	//if url does not contain the word PIERRE, exit
+	//TODO: this condition is bad, change it later
 
-	if scan.url == "" || !strings.Contains(scan.url, "PIERRE") {
-		fmt.Println("Please provide \"PIERRE\" in the URL where you want to fuzz\n Example: http://example.com/PIERRE")
+	if scan.url == "" || !((!strings.Contains(scan.url, "FUZZ") && strings.Contains(scan.header, "FUZZ")) ||
+		(strings.Contains(scan.url, "FUZZ") && !strings.Contains(scan.header, "FUZZ"))) {
+		fmt.Println("Please provide \"FUZZ\" in the URL where you want to fuzz\n Example: http://example.com/FUZZ")
 		flag.PrintDefaults()
 		os.Exit(1)
 	}
@@ -106,6 +110,7 @@ type scan_config struct {
 	threads             int
 	timeout             int
 	filter_codes_string string
+	header              string
 }
 
 func (s scan_config) fuzz_scan() { //post by default
@@ -163,9 +168,21 @@ func (s scan_config) fuzz_scan() { //post by default
 
 				client := &http.Client{
 					Timeout: time.Duration(s.timeout) * time.Millisecond,
+					CheckRedirect: func(req *http.Request, via []*http.Request) error {
+						return http.ErrUseLastResponse
+						//TODO: RIGHT NOWWWWWW< MAKE SURE TO PRINT THIS WAWAWAW
+					},
 				}
 
-				req, err := http.NewRequest("GET" /*s.url+sc1.Text()+ext_slice[i]*/, strings.Replace(s.url, "PIERRE", sc1.Text()+ext_slice[i], 1), nil) // client.Get(s.url + scanner.Text() + ext_slice[1])
+				// s.url+sc1.Text()+ext_slice[i] instead of stringsreplace
+				req, err := http.NewRequest("GET", strings.Replace(s.url, "FUZZ", sc1.Text()+ext_slice[i], 1), nil) // client.Get(s.url + scanner.Text() + ext_slice[1])
+				//FIXME: header must be able to be empty without index error
+
+				if s.header != "" {
+					header_slice := strings.Split(s.header, ": ") //TODO: account for unsuccessful split
+					req.Header.Add(header_slice[0], header_slice[1])
+					// req.Header.Add("Host", "FUZZ.0.0.0.0")
+				}
 
 				if err != nil {
 					handle_errors(err, "GET error: "+err.Error())
@@ -183,7 +200,31 @@ func (s scan_config) fuzz_scan() { //post by default
 				defer resp.Body.Close()
 
 				if strings.Contains(s.filter_codes_string, strconv.Itoa(resp.StatusCode)) { //add to output if matching code
-					output += "/" + sc1.Text() + ext_slice[i] + "\t\t\t[ Status: " + strconv.Itoa(resp.StatusCode) + " Size: " + strconv.FormatInt(resp.ContentLength, 10) + " ]\n"
+					output += sc1.Text() + ext_slice[i] + "\t\t\t[ Status: " + strconv.Itoa(resp.StatusCode) + " Size: " + strconv.FormatInt(resp.ContentLength, 10) + " ]\n"
+					//DELETE BELOW LATER
+					//read and print entire response
+					// body, err := httputil.DumpResponse(resp, true)
+					// if err != nil {
+					// 	handle_errors(err, "error reading body")
+					// }
+					// output += "~~~~~~~~~~~~~~~~~~~~~~~~~~~\n" + string(body) + "~~~~~~~~~~~~~~~~~~~~~~~~~~~\n" + "\n"
+
+					//another
+
+					//convert resp.Location() to string
+					// redirect_url, err := resp.Location()
+					// if err != nil {
+					// 	handle_errors(err, err.Error())
+					// }
+					// output += redirect_url.String() + "\n"
+
+					//another
+
+					// for k, v := range resp.Header {
+					// 	fmt.Print(k)
+					// 	fmt.Print(" : ")
+					// 	fmt.Println(v)
+					// }
 				}
 
 			}
@@ -195,7 +236,7 @@ func (s scan_config) fuzz_scan() { //post by default
 
 func handle_errors(err error, msg string) {
 	if err != nil {
-		fmt.Printf(msg)
+		fmt.Println(msg)
 		os.Exit(1) //change this later to be different for different errors
 	}
 }
