@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/moul/http2curl"
+
 	// "errors"
 	"fmt"
 )
@@ -83,7 +85,7 @@ func parse_flags(scan *scan_config) {
 	flag.StringVar(&scan.url, "u", "", "target url")
 	flag.StringVar(&scan.extension, "x", "", "list of extensions to fuzz with: comma separated")
 	flag.IntVar(&scan.threads, "th", 1, "specify the number of threads to run on")
-	flag.IntVar(&scan.timeout, "to", 100, "specify the limit for when requests should timeout")
+	flag.IntVar(&scan.timeout, "to", 500, "specify the limit for when requests should timeout")
 	flag.StringVar(&scan.filter_codes_string, "fi", "200,204,301,302,307,400,401,403,404,405,500", "filter include; specify which status codes to be included in output")
 	//TODO: add more codes!!!
 	flag.StringVar(&scan.header, "H", "", "specify a header to be sent with the request. Example: Host: FUZZ.example.com")
@@ -177,12 +179,17 @@ func (s scan_config) fuzz_scan() { //post by default
 				// s.url+sc1.Text()+ext_slice[i] instead of stringsreplace
 				req, err := http.NewRequest("GET", strings.Replace(s.url, "FUZZ", sc1.Text()+ext_slice[i], 1), nil) // client.Get(s.url + scanner.Text() + ext_slice[1])
 				//FIXME: header must be able to be empty without index error
+				//TODO: now!!!! the header isnt being put into the request properly
+				//ALSO ITERATING THROUGH HEADERS!!!
 
 				if s.header != "" {
 					header_slice := strings.Split(s.header, ": ") //TODO: account for unsuccessful split
-					req.Header.Add(header_slice[0], header_slice[1])
+					req.Host = strings.Replace(header_slice[1], "FUZZ", sc1.Text()+ext_slice[i], 1)
+					fmt.Println(header_slice[0] + "   owo    " + strings.Replace(header_slice[1], "FUZZ", sc1.Text()+ext_slice[i], 1))
 					// req.Header.Add("Host", "FUZZ.0.0.0.0")
 				}
+				command, _ := http2curl.GetCurlCommand(req)
+				fmt.Println(command)
 
 				if err != nil {
 					handle_errors(err, "GET error: "+err.Error())
@@ -202,7 +209,7 @@ func (s scan_config) fuzz_scan() { //post by default
 				if strings.Contains(s.filter_codes_string, strconv.Itoa(resp.StatusCode)) { //add to output if matching code
 					output += sc1.Text() + ext_slice[i] + "\t\t\t[ Status: " + strconv.Itoa(resp.StatusCode) + " Size: " + strconv.FormatInt(resp.ContentLength, 10) + " ]\n"
 					//DELETE BELOW LATER
-					//read and print entire response
+					// read and print entire response
 					// body, err := httputil.DumpResponse(resp, true)
 					// if err != nil {
 					// 	handle_errors(err, "error reading body")
