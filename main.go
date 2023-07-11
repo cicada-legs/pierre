@@ -88,7 +88,8 @@ func parse_flags(scan *scan_config) {
 	flag.IntVar(&scan.threads, "th", 1, "specify the number of threads to run on")
 	flag.IntVar(&scan.timeout, "to", 500, "specify the limit for when requests should timeout")
 	flag.StringVar(&scan.filter_include, "fi", "200,204,301,302,307,400,401,403,405,500", "filter include; specify which status codes to be included in output")
-	flag.StringVar(&scan.filter_exclude, "fe", "404", "filter exclude; specify which status codes to be excluded in output")
+	flag.StringVar(&scan.filter_exclude, "fe", "404", "filter exclude; specify which status codes to be excluded in output. Overrides filter include")
+	flag.StringVar(&scan.match_size, "ms", "", "specify response size; only allow responses of the specified size to be included in output")
 	//TODO: add more codes!!!
 	flag.StringVar(&scan.header, "H", "", "specify a header to be sent with the request. Example: Host: FUZZ.example.com")
 
@@ -115,6 +116,7 @@ type scan_config struct {
 	filter_include string
 	filter_exclude string
 	header         string
+	match_size     string
 }
 
 func (s scan_config) fuzz_scan() { //post by default
@@ -207,10 +209,11 @@ func (s scan_config) fuzz_scan() { //post by default
 				}
 
 				defer resp.Body.Close()
+				body_bytes, err := ioutil.ReadAll(resp.Body)
 
-				if strings.Contains(s.filter_include, strconv.Itoa(resp.StatusCode)) { //add to output if matching code
-
-					body_bytes, err := ioutil.ReadAll(resp.Body)
+				//if response size is not specified, include all responses!!!!
+				//count_response_bytes(body_bytes) == s.match_size || s.match_size == ""
+				if (!strings.Contains(s.filter_exclude, strconv.Itoa(resp.StatusCode))) && strings.Contains(s.filter_include, strconv.Itoa(resp.StatusCode)) { //add to output if matching code
 
 					if err != nil {
 						handle_errors(err, "error counting lines")
