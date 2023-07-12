@@ -89,8 +89,9 @@ func parse_flags(scan *scan_config) {
 	flag.IntVar(&scan.timeout, "to", 500, "specify the limit for when requests should timeout")
 	flag.StringVar(&scan.filter_include, "fi", "200,204,301,302,307,400,401,403,405,500", "filter include; specify which status codes to be included in output")
 	flag.StringVar(&scan.filter_exclude, "fe", "404", "filter exclude; specify which status codes to be excluded in output. Overrides filter include")
-	flag.StringVar(&scan.size_match, "ms", "", "specify response size; only allow responses of the specified size to be included in output")
-	flag.StringVar(&scan.size_exclude, "me", "", "exclude responses of a specified size from output")
+	flag.StringVar(&scan.size_include, "si", "", "specify response size; only allow responses of the specified size to be included in output")
+	flag.StringVar(&scan.size_exclude, "se", "", "exclude responses of a specified size from output")
+
 	flag.StringVar(&scan.regex_include, "ri", "", "specify a regex pattern to be included in output")
 	flag.StringVar(&scan.regex_exclude, "re", "", "specify a regex pattern to be excluded from output")
 
@@ -120,7 +121,7 @@ type scan_config struct {
 	filter_include string
 	filter_exclude string
 	header         string
-	size_match     string
+	size_include   string
 	size_exclude   string
 	regex_include  string
 	regex_exclude  string
@@ -219,8 +220,11 @@ func (s scan_config) fuzz_scan() { //post by default
 				body_bytes, err := ioutil.ReadAll(resp.Body)
 
 				//if response size is not specified, include all responses!!!!
-				//count_response_bytes(body_bytes) == s.match_size || s.match_size == ""
-				if (!strings.Contains(s.filter_exclude, strconv.Itoa(resp.StatusCode))) && strings.Contains(s.filter_include, strconv.Itoa(resp.StatusCode)) { //add to output if matching code
+				//TODO: CURRENTLY DOING THIS
+				//if size_include is specified, only include responses that match the size
+				//same for not matching
+				if (s.size_include == "" || ((!strings.Contains(s.size_exclude, strconv.Itoa(count_response_bytes(body_bytes)))) && strings.Contains(s.size_include, strconv.Itoa(count_response_bytes(body_bytes))))) ||
+					((!strings.Contains(s.filter_exclude, strconv.Itoa(resp.StatusCode))) && strings.Contains(s.filter_include, strconv.Itoa(resp.StatusCode))) { //add to output if matching code
 
 					if err != nil {
 						handle_errors(err, "error counting lines")
