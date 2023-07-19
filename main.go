@@ -224,8 +224,10 @@ func (s scan_config) fuzz_scan() { //post by default
 				//TODO: CURRENTLY DOING THIS
 				//if size_include is specified, only include responses that match the size
 				//same for not matching
+				//if size_include and size_sxclude both contain a number like 400, then size_sxclude should take precedence and 400 should be excludeed (skip the if statement)
 
-				if (s.size_include == "" || ((!strings.Contains(s.size_exclude, strconv.Itoa(count_response_bytes(body_bytes)))) && strings.Contains(s.size_include, strconv.Itoa(count_response_bytes(body_bytes))))) ||
+				if (s.size_include == "" || ((!strings.Contains(s.size_exclude, strconv.Itoa(count_response_bytes(body_bytes)))) && strings.Contains(s.size_include, strconv.Itoa(count_response_bytes(body_bytes))))) &&
+					(s.size_exclude == "" || !strings.Contains(s.size_exclude, strconv.Itoa(count_response_bytes(body_bytes)))) ||
 					((!strings.Contains(s.filter_exclude, strconv.Itoa(resp.StatusCode))) && strings.Contains(s.filter_include, strconv.Itoa(resp.StatusCode))) { //add to output if matching code
 
 					if err != nil {
