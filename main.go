@@ -92,6 +92,7 @@ func parse_flags(scan *scan_config) {
 	flag.StringVar(&scan.size_include, "si", "", "specify response size; only allow responses of the specified size to be included in output")
 	flag.StringVar(&scan.size_exclude, "se", "", "exclude responses of a specified size from output")
 
+	//TODO: later
 	flag.StringVar(&scan.regex_include, "ri", "", "specify a regex pattern to be included in output")
 	flag.StringVar(&scan.regex_exclude, "re", "", "specify a regex pattern to be excluded from output")
 
@@ -223,6 +224,7 @@ func (s scan_config) fuzz_scan() { //post by default
 				//TODO: CURRENTLY DOING THIS
 				//if size_include is specified, only include responses that match the size
 				//same for not matching
+
 				if (s.size_include == "" || ((!strings.Contains(s.size_exclude, strconv.Itoa(count_response_bytes(body_bytes)))) && strings.Contains(s.size_include, strconv.Itoa(count_response_bytes(body_bytes))))) ||
 					((!strings.Contains(s.filter_exclude, strconv.Itoa(resp.StatusCode))) && strings.Contains(s.filter_include, strconv.Itoa(resp.StatusCode))) { //add to output if matching code
 
