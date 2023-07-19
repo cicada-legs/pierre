@@ -93,6 +93,10 @@ func parse_flags(scan *scan_config) {
 	flag.StringVar(&scan.size_exclude, "se", "", "exclude responses of a specified size from output")
 
 	//TODO: later
+	flag.StringVar(&scan.wordnum_include, "wi", "", "specify number of words; only allow responses with the specified number of words to be included in output")
+	flag.StringVar(&scan.wordnum_exclude, "we", "", "exclude responses of a specified wordcount from output")
+
+	//TODO: later
 	flag.StringVar(&scan.regex_include, "ri", "", "specify a regex pattern to be included in output")
 	flag.StringVar(&scan.regex_exclude, "re", "", "specify a regex pattern to be excluded from output")
 
@@ -113,19 +117,21 @@ func parse_flags(scan *scan_config) {
 
 type scan_config struct {
 	//
-	post           bool
-	url            string
-	wordlist_file  string
-	extension      string
-	threads        int
-	timeout        int
-	filter_include string
-	filter_exclude string
-	header         string
-	size_include   string
-	size_exclude   string
-	regex_include  string
-	regex_exclude  string
+	post            bool
+	url             string
+	wordlist_file   string
+	extension       string
+	threads         int
+	timeout         int
+	filter_include  string
+	filter_exclude  string
+	header          string
+	size_include    string
+	size_exclude    string
+	regex_include   string
+	regex_exclude   string
+	wordnum_include string
+	wordnum_exclude string
 }
 
 func (s scan_config) fuzz_scan() { //post by default
