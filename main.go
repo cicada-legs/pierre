@@ -228,14 +228,11 @@ func (s scan_config) fuzz_scan() { //post by default
 
 				//if response size is not specified, include all responses!!!!
 				//TODO: CURRENTLY DOING THIS
-				//if size_include is specified, only include responses that match the size
-				//same for not matching
-				//if size_include and size_sxclude both contain a number like 400, then size_sxclude should take precedence and 400 should be excludeed (skip the if statement)
-				//ugg
+				//if size_include is specified, only include responses of that size
+				//if size_exclude is specified, exclude responses of that size
+				//if both are specified, only include responses of that size which are not excluded
 				bodybytes_string := strconv.Itoa(count_response_bytes(bodybytes))
-				if (s.size_include == "" && s.size_exclude == "") ||
-					((strings.Contains(s.size_include, bodybytes_string) && !strings.Contains(s.size_exclude, bodybytes_string)) ||
-						s.size_exclude != "" && !strings.Contains(s.size_exclude, bodybytes_string)) { //add to output if matching code
+				if (s.size_include != "" && strings.Contains(s.size_include, bodybytes_string)) || (s.size_exclude != "" && !strings.Contains(s.size_exclude, bodybytes_string)) || (s.size_include == "" && s.size_exclude == "") { //add to output if matching code
 
 					if err != nil {
 						handle_errors(err, "error counting lines")
