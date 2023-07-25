@@ -3,7 +3,7 @@ package main
 import (
 	"bufio"
 	"flag"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"runtime"
@@ -96,7 +96,7 @@ func parse_flags(scan *scan_config) {
 	flag.StringVar(&scan.wordnum_include, "wi", "", "specify number of words; only allow responses with the specified number of words to be included in output")
 	flag.StringVar(&scan.wordnum_exclude, "we", "", "exclude responses of a specified wordcount from output")
 
-	//TODO: later
+	//TODO: DOING THIS NOW: include first then others later
 	flag.StringVar(&scan.regex_include, "ri", "", "specify a regex pattern to be included in output")
 	flag.StringVar(&scan.regex_exclude, "re", "", "specify a regex pattern to be excluded from output")
 
@@ -136,7 +136,7 @@ type scan_config struct {
 
 func (s scan_config) fuzz_scan() { //post by default
 
-	count := 0
+	//count := 0
 	output := ""
 	ext_slice := strings.Split(s.extension, ",") // TODO: put this somewhere better
 
@@ -150,38 +150,9 @@ func (s scan_config) fuzz_scan() { //post by default
 
 	if s.post {
 
-		for sc1.Scan() {
+		//data field for post requests
 
-			for i := 0; i < len(ext_slice); i++ {
-				count++
-				// TODO: check below for errors from copilot
-
-				client := &http.Client{
-					Timeout: time.Duration(s.timeout) * time.Millisecond,
-				}
-				req, err := http.NewRequest("POST", s.url+sc1.Text()+ext_slice[i], nil) // client.Get(s.url + scanner.Text() + ext_slice[1])
-
-				if err != nil {
-					handle_errors(err, "ow")
-					return
-				}
-				resp, err := client.Do(req)
-				if err != nil {
-					// fmt.Println(err) /this is for testing only
-					//connection timeout, what to output at the end of the scan?
-					continue
-				}
-
-				defer resp.Body.Close()
-				// fmt.Println("code", resp.StatusCode)
-				if strings.Contains(s.filter_include, strconv.Itoa(resp.StatusCode)) { //add to output if matching code
-					output += sc1.Text() + ext_slice[i] + "\n"
-				}
-			}
-
-		}
-
-	} else { //TODO: adapt output for subdomain fuzzing
+	} else {
 
 		for sc1.Scan() { //TODO: SHOW REDIRECTS
 
@@ -191,21 +162,17 @@ func (s scan_config) fuzz_scan() { //post by default
 					Timeout: time.Duration(s.timeout) * time.Millisecond,
 					CheckRedirect: func(req *http.Request, via []*http.Request) error {
 						return http.ErrUseLastResponse
-						//TODO: RIGHT NOWWWWWW< MAKE SURE TO PRINT THIS WAWAWAW
 					},
 				}
 
 				// s.url+sc1.Text()+ext_slice[i] instead of stringsreplace
 				req, err := http.NewRequest("GET", strings.Replace(s.url, "FUZZ", sc1.Text()+ext_slice[i], 1), nil) // client.Get(s.url + scanner.Text() + ext_slice[1])
 				//FIXME: header must be able to be empty without index error
-				//TODO: now!!!! the header isnt being put into the request properly
-				//ALSO ITERATING THROUGH HEADERS!!!
 
 				if s.header != "" {
-					header_slice := strings.Split(s.header, ": ") //TODO: account for unsuccessful split
+					header_slice := strings.Split(s.header, ": ") //FIXME: account for unsuccessful split
 					req.Host = strings.Replace(header_slice[1], "FUZZ", sc1.Text()+ext_slice[i], 1)
 					fmt.Println(header_slice[0] + "   owo    " + strings.Replace(header_slice[1], "FUZZ", sc1.Text()+ext_slice[i], 1))
-					// req.Header.Add("Host", "FUZZ.0.0.0.0")
 				}
 				command, _ := http2curl.GetCurlCommand(req)
 				fmt.Println(command)
@@ -224,38 +191,26 @@ func (s scan_config) fuzz_scan() { //post by default
 				}
 
 				defer resp.Body.Close()
-				bodybytes, err := ioutil.ReadAll(resp.Body)
+				bodybytes, err := io.ReadAll(resp.Body)
 
 				//if response size is not specified, include all responses!!!!
-				//TODO: CURRENTLY DOING THIS
 				//if size_include is specified, only include responses of that size
 				//if size_exclude is specified, exclude responses of that size
 				//if both are specified, only include responses of that size which are not excluded
-				bodybytes_string := strconv.Itoa(count_response_bytes(bodybytes))
-				if (s.size_include != "" && strings.Contains(s.size_include, bodybytes_string)) || (s.size_exclude != "" && !strings.Contains(s.size_exclude, bodybytes_string)) || (s.size_include == "" && s.size_exclude == "") { //add to output if matching code
+				bodybytes_string := strconv.Itoa(count_response_bytes(bodybytes)) //keep as bytes,  but in string form
+				// fmt.Println(string(bodybytes))
+				fmt.Println("status code field: ", resp.StatusCode)
+				//FIXME: if statement eventually gets too long, make it tidier
+				//if match_int(s.size_include, bodybytes_string)
+				if filter(s, bodybytes_string, resp) { //add to output if matching code
 
 					if err != nil {
 						handle_errors(err, "error counting lines")
 					}
 
-					//FIXME: this formatting is painful, tidy it up
+					//TODO: this formatting is painful, tidy it up
 					output += sc1.Text() + ext_slice[i] + "\t\t\t[ Status: " + strconv.Itoa(resp.StatusCode) + " |" + " Size: " + strconv.Itoa(count_response_bytes(bodybytes)) + " |" + " Words: " + strconv.Itoa(count_response_words(bodybytes)) + " |" + " Lines: " + strconv.Itoa(count_response_lines(bodybytes)) + " ]\n"
 
-					//DELETE BELOW LATER
-					// read and print entire response
-					// body, err := httputil.DumpResponse(resp, true)
-					// if err != nil {
-					// 	handle_errors(err, "error reading body")
-					// }
-					// output += "~~~~~~~~~~~~~~~~~~~~~~~~~~~\n" + string(body) + "~~~~~~~~~~~~~~~~~~~~~~~~~~~\n" + "\n"
-
-					//another
-
-					// for k, v := range resp.Header {
-					// 	fmt.Print(k)
-					// 	fmt.Print(" : ")
-					// 	fmt.Println(v)
-					// }
 				}
 
 			}
@@ -270,6 +225,16 @@ func handle_errors(err error, msg string) {
 		fmt.Println(msg)
 		os.Exit(1) //change this later to be different for different errors
 	}
+}
+
+func filter(s scan_config, bodybytes_string string, resp *http.Response) bool {
+
+	status_match := !strings.Contains(s.filter_exclude, strconv.Itoa(resp.StatusCode)) && strings.Contains(s.filter_include, strconv.Itoa(resp.StatusCode))
+
+	//might need if statement for this
+	bytes_match := s.size_include != "" && strings.Contains(s.size_include, bodybytes_string) || (s.size_exclude != "" && !strings.Contains(s.size_exclude, bodybytes_string)) || (s.size_include == "" && s.size_exclude == "")
+
+	return status_match && bytes_match
 }
 
 // maybe get rid of these functions and just do it in the main function
