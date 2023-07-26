@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/moul/http2curl"
+	"gopkg.in/vmarkovtsev/go-lcss.v1"
 
 	// "errors"
 	"fmt"
@@ -138,7 +139,6 @@ func (s scan_config) fuzz_scan() { //post by default
 
 	//count := 0
 	output := ""
-	ext_slice := strings.Split(s.extension, ",") // TODO: put this somewhere better
 
 	fileread, err := os.Open(s.wordlist_file)
 	handle_errors(err, "Please provide a wordlist: -w <filepath>")
@@ -147,6 +147,7 @@ func (s scan_config) fuzz_scan() { //post by default
 	sc2 := bufio.NewScanner(fileread)
 	sc2.Split(bufio.ScanLines)
 	//total := count_file_lines(*sc2) * len(ext_slice)
+	ext_slice := strings.Split(s.extension, ",") // TODO: put this somewhere better
 
 	if s.post {
 
@@ -154,6 +155,7 @@ func (s scan_config) fuzz_scan() { //post by default
 
 	} else {
 
+		//looops here
 		for sc1.Scan() { //TODO: SHOW REDIRECTS
 
 			for i := 0; i < len(ext_slice); i++ {
@@ -227,9 +229,37 @@ func handle_errors(err error, msg string) {
 	}
 }
 
+func intersection(a, b []string) (result []string) { //get all of the common status codes, adapt later for other filtering too
+	string_boo := make(map[string]bool)
+
+	for _, thing := range a { //index = _, current element = a
+		string_boo[thing] = true
+	}
+
+	for _, thing := range b {
+		if _, exists := string_boo[thing]; exists {
+			result = append(result, thing)
+		}
+	}
+	return result
+}
+
 func filter(s scan_config, bodybytes_string string, resp *http.Response) bool {
 
-	status_match := !strings.Contains(s.filter_exclude, strconv.Itoa(resp.StatusCode)) && strings.Contains(s.filter_include, strconv.Itoa(resp.StatusCode))
+	//go run main.go -u="http://0.0.0.0:80/FUZZ" -w wordlist.txt -x .sum,.go -fi 404 -fe 404 doesnt work
+	status_inc_slice := strings.Split(s.filter_include, ",")
+	status_ex_slice := strings.Split(s.filter_exclude, ",")
+
+	// if s.filter_exclude and s.filter_include both include a common status code, the exclude will override the include
+	lcs := lcss.LongestCommonSubstring([]byte(s.filter_include), []byte(s.filter_exclude))
+	fmt.Println(string(lcs), " ", len(string(lcs)), " inc ", s.filter_include, " ex", s.filter_exclude)
+	//TODO: consider splitting these strings into byte? arrays at the beginning, or with one status code per index
+	if (s.filter_include != "" && s.filter_exclude != "") && len(string(lcs)) > 2 {
+		// fmt.Println("filter include and filter exclude cannot include the same status code")
+		// os.Exit(1)
+	}
+
+	status_match := (!strings.Contains(s.filter_exclude, strconv.Itoa(resp.StatusCode))) && strings.Contains(s.filter_include, strconv.Itoa(resp.StatusCode))
 
 	//might need if statement for this
 	bytes_match := s.size_include != "" && strings.Contains(s.size_include, bodybytes_string) || (s.size_exclude != "" && !strings.Contains(s.size_exclude, bodybytes_string)) || (s.size_include == "" && s.size_exclude == "")
