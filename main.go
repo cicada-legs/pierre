@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/moul/http2curl"
-	"gopkg.in/vmarkovtsev/go-lcss.v1"
+	"github.com/moul/http2curl" //delete later, just for testing
+	"golang.org/x/exp/slices"
 
 	// "errors"
 	"fmt"
@@ -251,12 +251,18 @@ func filter(s scan_config, bodybytes_string string, resp *http.Response) bool {
 	status_ex_slice := strings.Split(s.filter_exclude, ",")
 
 	// if s.filter_exclude and s.filter_include both include a common status code, the exclude will override the include
-	lcs := lcss.LongestCommonSubstring([]byte(s.filter_include), []byte(s.filter_exclude))
-	fmt.Println(string(lcs), " ", len(string(lcs)), " inc ", s.filter_include, " ex", s.filter_exclude)
-	//TODO: consider splitting these strings into byte? arrays at the beginning, or with one status code per index
-	if (s.filter_include != "" && s.filter_exclude != "") && len(string(lcs)) > 2 {
-		// fmt.Println("filter include and filter exclude cannot include the same status code")
-		// os.Exit(1)
+	status_intersection := intersection(status_inc_slice, status_ex_slice)
+
+	//only include codes not in the intersection
+	if len(intersection(status_inc_slice, status_ex_slice)) > 0 { //intersection occured
+		fmt.Println("intersection: ", status_intersection)
+		// remove duplicates from include, or just return false if intersection contains response code
+
+		//response code is the same as the intersection code, return false
+		return !slices.Contains(status_intersection, resp.StatusCode) //TODO: test thissssssssssssssssssssssssss
+
+	} else if strings.Contains(s.filter_include, strconv.Itoa(resp.StatusCode)) && !strings.Contains(s.filter_exclude, strconv.Itoa(resp.StatusCode)) { //
+
 	}
 
 	status_match := (!strings.Contains(s.filter_exclude, strconv.Itoa(resp.StatusCode))) && strings.Contains(s.filter_include, strconv.Itoa(resp.StatusCode))
