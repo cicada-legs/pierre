@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/moul/http2curl" //delete later, just for testing
-	"golang.org/x/exp/slices"
-
+	//import the filter package
+	"github.com/cicada-legs/pierre/pkg/filter"
 	// "errors"
 	"fmt"
 )
@@ -204,7 +204,8 @@ func (s scan_config) fuzz_scan() { //post by default
 				fmt.Println("status code field: ", resp.StatusCode)
 				//FIXME: if statement eventually gets too long, make it tidier
 				//if match_int(s.size_include, bodybytes_string)
-				if filter(s, bodybytes_string, resp) { //add to output if matching code
+
+				if filter2(s, bodybytes_string, resp) { //add to output if matching code
 
 					if err != nil {
 						handle_errors(err, "error counting lines")
@@ -229,37 +230,22 @@ func handle_errors(err error, msg string) {
 	}
 }
 
-func intersection(a, b []string) (result []string) { //get all of the common status codes, adapt later for other filtering too
-	string_boo := make(map[string]bool)
-
-	for _, thing := range a { //index = _, current element = a
-		string_boo[thing] = true
-	}
-
-	for _, thing := range b {
-		if _, exists := string_boo[thing]; exists {
-			result = append(result, thing)
-		}
-	}
-	return result
-}
-
-func filter(s scan_config, bodybytes_string string, resp *http.Response) bool {
+func filter2(s scan_config, bodybytes_string string, resp *http.Response) bool {
 
 	//go run main.go -u="http://0.0.0.0:80/FUZZ" -w wordlist.txt -x .sum,.go -fi 404 -fe 404 doesnt work
 	status_inc_slice := strings.Split(s.filter_include, ",")
 	status_ex_slice := strings.Split(s.filter_exclude, ",")
 
 	// if s.filter_exclude and s.filter_include both include a common status code, the exclude will override the include
-	status_intersection := intersection(status_inc_slice, status_ex_slice)
+	status_intersection := filter.Intersection(status_inc_slice, status_ex_slice)
 
 	//only include codes not in the intersection
-	if len(intersection(status_inc_slice, status_ex_slice)) > 0 { //intersection occured
+	if len(filter.Intersection(status_inc_slice, status_ex_slice)) > 0 { //intersection occured
 		fmt.Println("intersection: ", status_intersection)
 		// remove duplicates from include, or just return false if intersection contains response code
 
 		//response code is the same as the intersection code, return false
-		return !slices.Contains(status_intersection, resp.StatusCode) //TODO: test thissssssssssssssssssssssssss
+		return !filter.Contains(status_intersection, strconv.Itoa(resp.StatusCode)) //TODO: test thissssssssssssssssssssssssss
 
 	} else if strings.Contains(s.filter_include, strconv.Itoa(resp.StatusCode)) && !strings.Contains(s.filter_exclude, strconv.Itoa(resp.StatusCode)) { //
 
@@ -271,6 +257,10 @@ func filter(s scan_config, bodybytes_string string, resp *http.Response) bool {
 	bytes_match := s.size_include != "" && strings.Contains(s.size_include, bodybytes_string) || (s.size_exclude != "" && !strings.Contains(s.size_exclude, bodybytes_string)) || (s.size_include == "" && s.size_exclude == "")
 
 	return status_match && bytes_match
+}
+
+func Intersection(status_inc_slice, status_ex_slice []string) {
+	panic("unimplemented")
 }
 
 // maybe get rid of these functions and just do it in the main function
