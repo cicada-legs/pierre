@@ -193,17 +193,10 @@ func (s scan_config) fuzz_scan() { //post by default
 				}
 
 				defer resp.Body.Close()
-				bodybytes, err := io.ReadAll(resp.Body)
 
-				//if response size is not specified, include all responses!!!!
-				//if size_include is specified, only include responses of that size
-				//if size_exclude is specified, exclude responses of that size
-				//if both are specified, only include responses of that size which are not excluded
+				bodybytes, err := io.ReadAll(resp.Body)
 				bodybytes_string := strconv.Itoa(count_response_bytes(bodybytes)) //keep as bytes,  but in string form
-				// fmt.Println(string(bodybytes))
 				fmt.Println("status code field: ", resp.StatusCode)
-				//FIXME: if statement eventually gets too long, make it tidier
-				//if match_int(s.size_include, bodybytes_string)
 
 				if filter2(s, bodybytes_string, resp) { //add to output if matching code
 
@@ -239,12 +232,12 @@ func filter2(s scan_config, bodybytes_string string, resp *http.Response) bool {
 	status_intersection := filter.Intersection(status_inc_slice, status_ex_slice)
 
 	//remove intersection codes from incluide so exclude can override
-	if len(filter.Intersection(status_inc_slice, status_ex_slice)) > 0 { //intersection occured
+	if len(filter.Intersection(status_inc_slice, status_ex_slice)) > 0 {
 		fmt.Println("intersection: ", status_intersection)
 		status_inc_slice = filter.Remove(status_inc_slice, status_intersection)
 	}
-	// return filter.Contains(status_inc_slice, strconv.Itoa(resp.StatusCode)) || !filter.Contains(status_ex_slice, strconv.Itoa(resp.StatusCode))
-	//if status_inc_slice is not empty, ojnly include responses with those codes. if status_ex_slice is not empty, exclude only responses with those codes
+
+	//TODO: refactor this into one line later maybe
 	if len(status_inc_slice) == 0 && len(status_ex_slice) == 0 { //both empty
 		return true
 	} else if filter.Contains(status_inc_slice, strconv.Itoa(resp.StatusCode)) {
@@ -252,9 +245,6 @@ func filter2(s scan_config, bodybytes_string string, resp *http.Response) bool {
 	} else if filter.Contains(status_ex_slice, strconv.Itoa(resp.StatusCode)) {
 		return false
 	}
-
-	// return (len(status_inc_slice) == 0 || filter.Contains(status_inc_slice, strconv.Itoa(resp.StatusCode))) &&
-	// 	(len(status_ex_slice) == 0 || !filter.Contains(status_ex_slice, strconv.Itoa(resp.StatusCode)))
 	return false
 }
 
