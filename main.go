@@ -230,6 +230,7 @@ func handle_errors(err error, msg string) {
 	}
 }
 
+// FIXME: dont name this filter2 pls lmao
 func filter2(s scan_config, bodybytes_string string, resp *http.Response) bool {
 
 	status_inc_slice := strings.Split(s.filter_include, ",")
@@ -243,7 +244,17 @@ func filter2(s scan_config, bodybytes_string string, resp *http.Response) bool {
 		status_inc_slice = filter.Remove(status_inc_slice, status_intersection)
 	}
 	// return filter.Contains(status_inc_slice, strconv.Itoa(resp.StatusCode)) || !filter.Contains(status_ex_slice, strconv.Itoa(resp.StatusCode))
-	//delete later
+	//if status_inc_slice is not empty, ojnly include responses with those codes. if status_ex_slice is not empty, exclude only responses with those codes
+	if len(status_inc_slice) == 0 && len(status_ex_slice) == 0 { //both empty
+		return true
+	} else if filter.Contains(status_inc_slice, strconv.Itoa(resp.StatusCode)) {
+		return true
+	} else if filter.Contains(status_ex_slice, strconv.Itoa(resp.StatusCode)) {
+		return false
+	}
+
+	// return (len(status_inc_slice) == 0 || filter.Contains(status_inc_slice, strconv.Itoa(resp.StatusCode))) &&
+	// 	(len(status_ex_slice) == 0 || !filter.Contains(status_ex_slice, strconv.Itoa(resp.StatusCode)))
 	return false
 }
 
