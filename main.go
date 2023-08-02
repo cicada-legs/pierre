@@ -88,8 +88,8 @@ func parse_flags(scan *scan_config) {
 	flag.StringVar(&scan.extension, "x", "", "list of extensions to fuzz with: comma separated")
 	flag.IntVar(&scan.threads, "th", 1, "specify the number of threads to run on")
 	flag.IntVar(&scan.timeout, "to", 500, "specify the limit for when requests should timeout")
-	flag.StringVar(&scan.filter_include, "fi", "200,204,301,302,307,400,401,403,405,500", "filter include; specify which status codes to be included in output")
-	flag.StringVar(&scan.filter_exclude, "fe", "404", "filter exclude; specify which status codes to be excluded in output. Overrides filter include")
+	flag.StringVar(&scan.status_include, "fi", "200,204,301,302,307,400,401,403,405,500", "filter include; specify which status codes to be included in output")
+	flag.StringVar(&scan.status_exclude, "fe", "404", "filter exclude; specify which status codes to be excluded in output. Overrides filter include")
 	flag.StringVar(&scan.size_include, "si", "", "specify response size; only allow responses of the specified size to be included in output")
 	flag.StringVar(&scan.size_exclude, "se", "", "exclude responses of a specified size from output")
 
@@ -124,8 +124,8 @@ type scan_config struct {
 	extension       string
 	threads         int
 	timeout         int
-	filter_include  string
-	filter_exclude  string
+	status_include  string
+	status_exclude  string
 	header          string
 	size_include    string
 	size_exclude    string
@@ -226,23 +226,23 @@ func handle_errors(err error, msg string) {
 // FIXME: dont name this filter2 pls lmao
 func filter2(s scan_config, bodybytes_string string, resp *http.Response) bool {
 
-	status_inc_slice := strings.Split(s.filter_include, ",")
-	status_ex_slice := strings.Split(s.filter_exclude, ",")
+	inc_slice := strings.Split(s.status_include, ",")
+	ex_slice := strings.Split(s.status_exclude, ",")
 
-	status_intersection := filter.Intersection(status_inc_slice, status_ex_slice)
+	status_intersection := filter.Intersection(inc_slice, ex_slice)
 
 	//remove intersection codes from incluide so exclude can override
-	if len(filter.Intersection(status_inc_slice, status_ex_slice)) > 0 {
+	if len(filter.Intersection(inc_slice, ex_slice)) > 0 {
 		fmt.Println("intersection: ", status_intersection)
-		status_inc_slice = filter.Remove(status_inc_slice, status_intersection)
+		inc_slice = filter.Remove(inc_slice, status_intersection)
 	}
 
 	//TODO: refactor this into one line later maybe
-	if len(status_inc_slice) == 0 && len(status_ex_slice) == 0 { //both empty
+	if len(inc_slice) == 0 && len(ex_slice) == 0 { //both empty
 		return true
-	} else if filter.Contains(status_inc_slice, strconv.Itoa(resp.StatusCode)) {
+	} else if filter.Contains(inc_slice, strconv.Itoa(resp.StatusCode)) {
 		return true
-	} else if filter.Contains(status_ex_slice, strconv.Itoa(resp.StatusCode)) {
+	} else if filter.Contains(ex_slice, strconv.Itoa(resp.StatusCode)) {
 		return false
 	}
 	return false
