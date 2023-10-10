@@ -198,9 +198,9 @@ func (s scan_config) fuzz_scan() { //post by default
 				bodybytes_string := strconv.Itoa(count_response_bytes(bodybytes)) //keep as bytes,  but in string form
 				fmt.Println("status code field: ", resp.StatusCode)
 
-				if filter2(s, bodybytes_string, resp) { //add to output if matching code
+				if filter_flags(s, bodybytes_string, resp) { //add to output if matching code
 
-					if err != nil {
+					if err != nil { //do i still need this
 						handle_errors(err, "error counting lines")
 					}
 
@@ -223,26 +223,27 @@ func handle_errors(err error, msg string) {
 	}
 }
 
-// FIXME: dont name this filter2 pls lmao
-func filter2(s scan_config, bodybytes_string string, resp *http.Response) bool {
+// FIXME: dont name this filter_flags pls lmao
+// TODO: also add ranges so numbers dont have to be specific. maybe consider using generics, or just keep all the filter vars as strings
+func filter_flags(s scan_config, bodybytes_string string, resp *http.Response) bool {
 
 	inc_slice := strings.Split(s.status_include, ",")
-	ex_slice := strings.Split(s.status_exclude, ",")
+	exc_slice := strings.Split(s.size_exclude, ",")
 
-	status_intersection := filter.Intersection(inc_slice, ex_slice)
+	status_intersection := filter.Intersection(inc_slice, exc_slice)
 
 	//remove intersection codes from incluide so exclude can override
-	if len(filter.Intersection(inc_slice, ex_slice)) > 0 {
+	if len(filter.Intersection(inc_slice, exc_slice)) > 0 {
 		fmt.Println("intersection: ", status_intersection)
 		inc_slice = filter.Remove(inc_slice, status_intersection)
 	}
 
 	//TODO: refactor this into one line later maybe
-	if len(inc_slice) == 0 && len(ex_slice) == 0 { //both empty
+	if len(inc_slice) == 0 && len(exc_slice) == 0 { //both empty
 		return true
 	} else if filter.Contains(inc_slice, strconv.Itoa(resp.StatusCode)) {
 		return true
-	} else if filter.Contains(ex_slice, strconv.Itoa(resp.StatusCode)) {
+	} else if filter.Contains(exc_slice, strconv.Itoa(resp.StatusCode)) {
 		return false
 	}
 	return false
